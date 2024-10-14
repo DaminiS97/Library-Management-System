@@ -1,0 +1,135 @@
+from datetime import datetime, timedelta
+import json
+
+# Constants
+FINE_PER_DAY = 1  # Fine amount per day for overdue items
+
+# Data storage
+library_data = {
+    'books': [],
+    'magazines': [],
+    'dvds': []
+}
+
+# Utility functions
+def save_data():
+    with open('library_data.json', 'w') as file:
+        json.dump(library_data, file)
+
+def load_data():
+    global library_data
+    try:
+        with open('library_data.json', 'r') as file:
+            library_data = json.load(file)
+    except FileNotFoundError:
+        library_data = {'books': [], 'magazines': [], 'dvds': []}
+
+# Library item class
+class LibraryItem:
+    def __init__(self, title, category, author=None):
+        self.title = title
+        self.category = category
+        self.author = author
+        self.checked_out = False
+        self.due_date = None
+
+    def __str__(self):
+        return f"Title: {self.title}, Category: {self.category}, Author: {self.author}, Checked Out: {self.checked_out}"
+
+# Functions to manage library items
+def add_item(item_type, title, category, author=None):
+    item_classes = {
+        'book': LibraryItem,
+        'magazine': LibraryItem,
+        'dvd': LibraryItem
+    }
+    if item_type not in item_classes:
+        print("Invalid item type")
+        return
+    new_item = item_classes[item_type](title, category, author)
+    library_data[item_type + 's'].append(new_item.__dict__)
+    save_data()
+    print(f"Added new {item_type}: {new_item}")
+
+def check_out_item(title, item_type):
+    for item in library_data[item_type + 's']:
+        if item['title'] == title and not item['checked_out']:
+            item['checked_out'] = True
+            item['due_date'] = (datetime.now() + timedelta(days=14)).strftime('%Y-%m-%d')
+            save_data()
+            print(f"Checked out: {title}")
+            return
+    print(f"{title} is either already checked out or does not exist.")
+
+def return_item(title, item_type):
+    for item in library_data[item_type + 's']:
+        if item['title'] == title and item['checked_out']:
+            item['checked_out'] = False
+            due_date = datetime.strptime(item['due_date'], '%Y-%m-%d')
+            overdue_days = (datetime.now() - due_date).days
+            if overdue_days > 0:
+                fine = overdue_days * FINE_PER_DAY
+                print(f"Item returned late. Fine: ${fine}")
+            else:
+                print("Item returned on time.")
+            item['due_date'] = None
+            save_data()
+            return
+    print(f"{title} was not checked out or does not exist.")
+
+def search_items(title=None, author=None, category=None):
+    results = []
+    for item_type in library_data:
+        for item in library_data[item_type]:
+            if (title and title.lower() in item['title'].lower()) or \
+               (author and author.lower() in item['author'].lower()) or \
+               (category and category.lower() in item['category'].lower()):
+                results.append(item)
+    return results
+
+def display_items(items):
+    for item in items:
+        print(f"Title: {item['title']}, Category: {item['category']}, Author: {item.get('author', 'N/A')}, Checked Out: {item['checked_out']}")
+
+# Command-line interface
+def main():
+    load_data()
+    
+    while True:
+        print("\nLibrary Management System")
+        print("1. Add Item")
+        print("2. Check Out Item")
+        print("3. Return Item")
+        print("4. Search Items")
+        print("5. Exit")
+
+        choice = input("Enter your choice: ")
+
+        if choice == '1':
+            item_type = input("Enter item type (book/magazine/dvd): ").lower()
+            title = input("Enter title: ")
+            category = input("Enter category: ")
+            author = input("Enter author (leave blank if not applicable): ")
+            add_item(item_type, title, category, author if author else None)
+        elif choice == '2':
+            title = input("Enter title of item to check out: ")
+            item_type = input("Enter item type (book/magazine/dvd): ").lower()
+            check_out_item(title, item_type)
+        elif choice == '3':
+            title = input("Enter title of item to return: ")
+            item_type = input("Enter item type (book/magazine/dvd): ").lower()
+            return_item(title, item_type)
+        elif choice == '4':
+            title = input("Enter title to search (leave blank if not applicable): ")
+            author = input("Enter author to search (leave blank if not applicable): ")
+            category = input("Enter category to search (leave blank if not applicable): ")
+            results = search_items(title if title else None, author if author else None, category if category else None)
+            display_items(results)
+        elif choice == '5':
+            print("Exiting...")
+            break
+        else:
+            print("Invalid choice. Please try again.")
+
+if __name__ == "__main__":
+    main()
